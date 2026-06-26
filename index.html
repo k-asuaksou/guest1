@@ -536,8 +536,10 @@ function todayStr() {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d - tz).toISOString().slice(0, 10);
 }
-function escapeHtml(str) {
-  return (str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function escapeHtml(value) {
+  // スプレッドシート側で部屋番号などが「数値」として保存された場合に
+  // .replace() が使えずクラッシュするのを防ぐため、必ず文字列化する
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function formatDateHeading(dateStr) {
   if (!dateStr) return '日付未設定';
@@ -553,18 +555,22 @@ function formatDateShort(dateStr) {
 }
 function getTotalGuests(n) {
   // 新形式(大人/子供A/B/D)と旧形式(peopleCountのみ)の両方に対応
+  // スプレッドシート側の書式により数値が文字列で返るケースに備えNumber()で明示変換
   if (n.adultCount != null || n.childACount != null) {
-    return (n.adultCount||0) + (n.childACount||0) + (n.childBCount||0) + (n.childDCount||0);
+    return (Number(n.adultCount)||0) + (Number(n.childACount)||0) + (Number(n.childBCount)||0) + (Number(n.childDCount)||0);
   }
-  return n.peopleCount || 0;
+  return Number(n.peopleCount) || 0;
 }
 function formatGuestBreakdown(n) {
   const parts = [];
-  const adult = n.adultCount != null ? n.adultCount : (n.peopleCount || 0);
+  const adult = n.adultCount != null ? Number(n.adultCount)||0 : (Number(n.peopleCount) || 0);
+  const childA = Number(n.childACount) || 0;
+  const childB = Number(n.childBCount) || 0;
+  const childD = Number(n.childDCount) || 0;
   if (adult) parts.push(`大人${adult}名`);
-  if (n.childACount) parts.push(`子供A${n.childACount}名`);
-  if (n.childBCount) parts.push(`子供B${n.childBCount}名`);
-  if (n.childDCount) parts.push(`子供D${n.childDCount}名`);
+  if (childA) parts.push(`子供A${childA}名`);
+  if (childB) parts.push(`子供B${childB}名`);
+  if (childD) parts.push(`子供D${childD}名`);
   return parts.join('・');
 }
 function showToast(msg) {
@@ -620,16 +626,17 @@ function renderList() {
 
   if (q) {
     notes = notes.filter(n =>
-      (n.guestName || '').toLowerCase().includes(q) ||
-      (n.roomNumber || '').toLowerCase().includes(q) ||
-      (n.visitDate || '').includes(q) ||
+      String(n.guestName ?? '').toLowerCase().includes(q) ||
+      String(n.roomNumber ?? '').toLowerCase().includes(q) ||
+      String(n.visitDate ?? '').includes(q) ||
       formatDateShort(n.visitDate).includes(q)
     );
   }
 
   notes.sort((a, b) => {
-    if (a.visitDate !== b.visitDate) return (b.visitDate || '').localeCompare(a.visitDate || '');
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
+    const ad = String(a.visitDate ?? ''), bd = String(b.visitDate ?? '');
+    if (ad !== bd) return bd.localeCompare(ad);
+    return String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''));
   });
 
   document.getElementById('count-line').textContent =
@@ -652,7 +659,8 @@ function renderList() {
       html += `<div class="date-heading">${formatDateHeading(n.visitDate)}</div>`;
       lastDate = n.visitDate;
     }
-    const hasFlag = !!(n.nextNotes && n.nextNotes.trim());
+    const hasFlag = !!(n.nextNotes && String(n.nextNotes).trim());
+    const nextNotesStr = String(n.nextNotes ?? '');
     const mealLabel = n.mealType ? (n.mealType === '夕食' && n.dinnerCourse ? `夕食（${n.dinnerCourse}）` : n.mealType) : '';
     html += `
       <div class="note-card ${hasFlag ? 'has-flag' : ''}" data-id="${n.id}">
@@ -667,7 +675,7 @@ function renderList() {
             ${mealLabel ? `<span class="pill pill-meal">${escapeHtml(mealLabel)}</span>` : ''}
             ${n.allergies ? `<span class="pill pill-allergy">⚠ アレルギー有</span>` : ''}
           </div>
-          ${hasFlag ? `<div class="flag-row"><span class="stamp-mini">要</span> 次回注意：${escapeHtml(n.nextNotes).slice(0,28)}${n.nextNotes.length>28?'…':''}</div>` : ''}
+          ${hasFlag ? `<div class="flag-row"><span class="stamp-mini">要</span> 次回注意：${escapeHtml(nextNotesStr).slice(0,28)}${nextNotesStr.length>28?'…':''}</div>` : ''}
         </div>
         <button class="card-delete-btn" data-id="${n.id}" aria-label="削除" title="削除">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
