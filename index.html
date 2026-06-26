@@ -102,6 +102,11 @@
     border:none; outline:none; background:transparent; flex:1; color:var(--ink); font-size:15px;
   }
   .count-line{ font-size:12px; color:var(--ink-soft); margin:6px 4px 2px; }
+  .setup-banner{
+    background:rgba(171,70,50,0.10); color:var(--vermillion); border:1px solid var(--vermillion-soft);
+    border-radius:var(--radius-s); padding:10px 14px; font-size:12.5px; margin:10px 0; line-height:1.6;
+  }
+  .setup-banner code{ background:rgba(0,0,0,0.06); padding:1px 5px; border-radius:4px; }
 
   /* ── 台帳カード一覧 ───────────────────────── */
   .date-heading{
@@ -276,6 +281,9 @@
 
   <!-- ════════════ 一覧画面 ════════════ -->
   <section id="view-list" class="view active">
+    <div class="setup-banner" id="setup-banner" style="display:none;">
+      ⚠ Googleスプレッドシート連携が未設定です。コード内の <code>	https://www.googleapis.com/auth/spreadsheets</code> に、発行したWebアプリのURLを貼り付けてください。
+    </div>
     <div class="search-wrap">
       <div class="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -445,52 +453,66 @@
    この DataStore オブジェクトの内部実装だけを書き換えれば良い
    ように getAll / add / update / remove のシグネチャを固定している。
    ════════════════════════════════════════════════════════════ */
-const DataStore = {
-  KEY: 'guest-notes',     // 1つのキーに配列としてまとめて保存（少量データのため）
-  SHARED: true,           // スタッフ全員で共有するデータ
+/* ════════════════════════════════════════════════════════════
+   設定：Googleスプレッドシート連携
+   ──────────────────────────────────────────────────────────
+   Google Apps Script で発行した「Webアプリ」のURLをここに貼り付けてください。
+   例： 'https://script.google.com/macros/s/AKfycb.../exec'
+   （発行手順とApps Scriptのコードは別途ご案内します）
+   ════════════════════════════════════════════════════════════ */
+const SHEETS_API_URL = '	https://www.googleapis.com/auth/spreadsheets';
 
-  async getAll() {
+/* ════════════════════════════════════════════════════════════
+   データ層 (DataStore)
+   ──────────────────────────────────────────────────────────
+   Googleスプレッドシート(Apps Script Web App)をバックエンドとして使用。
+   getAll / add / update / remove のシグネチャは変更していないため、
+   画面側のコード（一覧・登録・編集・削除）は一切変更不要。
+   ════════════════════════════════════════════════════════════ */
+const DataStore = {
+  isConfigured() {
+    return /^https:\/\/script\.google\.com\//.test(	https://www.googleapis.com/auth/spreadsheets);
+  },
+  async _call(payload) {
     try {
-      const res = await window.storage.get(this.KEY, this.SHARED);
-      return res && res.value ? JSON.parse(res.value) : [];
+      const res = await fetch(	https://www.googleapis.com/auth/spreadsheets, {
+        method: 'POST',
+        // text/plain にするとブラウザのCORSプリフライトを回避できる
+        // (Apps Script Web Appの既知の制約への対処。本文側でJSONとして解釈する)
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
     } catch (e) {
-      // キーが存在しない場合などはここに来る
-      return [];
+      console.error('通信エラー', e);
+      return null;
     }
   },
-  async _saveAll(notes) {
-    try {
-      const res = await window.storage.set(this.KEY, JSON.stringify(notes), this.SHARED);
-      if (!res) throw new Error('save failed');
-      return true;
-    } catch (e) {
-      console.error('保存エラー', e);
-      return false;
-    }
+  async getAll() {
+    if (!this.isConfigured()) return [];
+    const result = await this._call({ action: 'list' });
+    return Array.isArray(result) ? result : [];
   },
   async add(note) {
-    const notes = await this.getAll();
-    notes.push(note);
-    return this._saveAll(notes);
+    const result = await this._call({ action: 'add', note });
+    return !!(result && result.ok);
   },
   async update(id, updatedFields) {
-    const notes = await this.getAll();
-    const idx = notes.findIndex(n => n.id === id);
-    if (idx === -1) return false;
-    notes[idx] = { ...notes[idx], ...updatedFields };
-    return this._saveAll(notes);
+    // サーバー側は1行を全文上書きする設計のため、既存データとマージしてから送信
+    const all = await this.getAll();
+    const current = all.find(n => n.id === id) || {};
+    const merged = { ...current, ...updatedFields };
+    const result = await this._call({ action: 'update', id, note: merged });
+    return !!(result && result.ok);
   },
   async remove(id) {
-    const notes = await this.getAll();
-    const filtered = notes.filter(n => n.id !== id);
-    return this._saveAll(filtered);
+    const result = await this._call({ action: 'remove', id });
+    return !!(result && result.ok);
   }
 };
-/* ─── 将来移行する場合の例 ───────────────────────────────────
-   Google スプレッドシート: Apps Script の Web アプリ API を fetch() で
-   呼び出し、getAll は GET、add/update/remove は POST するよう書き換える。
-   Supabase: supabase-js の from('guest_notes').select() / insert() /
-   update() / delete() に置き換える。呼び出し側のコードは変更不要。
+/* ─── Supabaseへ移行する場合 ─────────────────────────────────
+   supabase-js の from('guest_notes').select() / insert() / update() /
+   delete() に置き換えてください。呼び出し側のコードは変更不要です。
    ──────────────────────────────────────────────────────────── */
 
 
@@ -585,6 +607,7 @@ function showView(id) {
    一覧画面
    ════════════════════════════════════════════════════════════ */
 async function refreshAndRenderList() {
+  document.getElementById('setup-banner').style.display = DataStore.isConfigured() ? 'none' : 'block';
   document.getElementById('list-container').innerHTML =
     '<p style="text-align:center;color:var(--ink-soft);padding:30px 0;">読み込み中…</p>';
   allNotes = await DataStore.getAll();
