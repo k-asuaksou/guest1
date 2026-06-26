@@ -282,7 +282,7 @@
   <!-- ════════════ 一覧画面 ════════════ -->
   <section id="view-list" class="view active">
     <div class="setup-banner" id="setup-banner" style="display:none;">
-      ⚠ Googleスプレッドシート連携が未設定です。コード内の <code>	https://www.googleapis.com/auth/spreadsheets</code> に、発行したWebアプリのURLを貼り付けてください。
+      ⚠ Googleスプレッドシート連携が未設定です。コード内の <code>https://script.google.com/macros/s/AKfycbzIo5P2vGi65-Dtvc20GyyhFI4CJkDf0TWtgSJtiMhdq03l3-US_VLok_bwM1JH5A3lgQ/exec</code> に、発行したWebアプリのURLを貼り付けてください。
     </div>
     <div class="search-wrap">
       <div class="search-box">
@@ -460,8 +460,7 @@
    例： 'https://script.google.com/macros/s/AKfycb.../exec'
    （発行手順とApps Scriptのコードは別途ご案内します）
    ════════════════════════════════════════════════════════════ */
-const SHEETS_API_URL = '	https://www.googleapis.com/auth/spreadsheets';
-
+https://script.google.com/macros/s/AKfycbzIo5P2vGi65-Dtvc20GyyhFI4CJkDf0TWtgSJtiMhdq03l3-US_VLok_bwM1JH5A3lgQ/exec
 /* ════════════════════════════════════════════════════════════
    データ層 (DataStore)
    ──────────────────────────────────────────────────────────
@@ -471,11 +470,11 @@ const SHEETS_API_URL = '	https://www.googleapis.com/auth/spreadsheets';
    ════════════════════════════════════════════════════════════ */
 const DataStore = {
   isConfigured() {
-    return /^https:\/\/script\.google\.com\//.test(	https://www.googleapis.com/auth/spreadsheets);
+    return /^https:\/\/script\.google\.com\//.test(https://script.google.com/macros/s/AKfycbzIo5P2vGi65-Dtvc20GyyhFI4CJkDf0TWtgSJtiMhdq03l3-US_VLok_bwM1JH5A3lgQ/exec
   },
   async _call(payload) {
     try {
-      const res = await fetch(	https://www.googleapis.com/auth/spreadsheets, {
+      const res = await fetch(https://script.google.com/macros/s/AKfycbzIo5P2vGi65-Dtvc20GyyhFI4CJkDf0TWtgSJtiMhdq03l3-US_VLok_bwM1JH5A3lgQ/exec
         method: 'POST',
         // text/plain にするとブラウザのCORSプリフライトを回避できる
         // (Apps Script Web Appの既知の制約への対処。本文側でJSONとして解釈する)
