@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>飛鳥荘 顧客管理ノート</title>
+<style>
+  :root{
+    /* ── 配色トークン ───────────────────────────
+       生成り(washi) × 藍(indigo) × 朱(hanko vermillion) × 古金(bronze)
+       料亭旅館の台帳・印譜をイメージした落ち着いた配色 */
+    --bg:           #efeae0;
+    --bg-soft:      #e6ded0;
+    --surface:      #f8f5ee;
+    --surface-2:    #ece4d2;
+    --ink:          #2b2a28;
+    --ink-soft:     #6b6359;
+    --line:         #d8cdb4;
+    --indigo:       #233e52;
+    --indigo-dark:  #16293a;
+    --indigo-soft:  #3d5b73;
+    --vermillion:   #ab4632;
+    --vermillion-soft: #c97e6b;
+    --gold:         #93783f;
+    --radius-s: 8px;
+    --radius-m: 14px;
+    --radius-l: 22px;
+    --shadow: 0 3px 14px rgba(43,38,32,0.10);
+    --serif: "Hiragino Mincho ProN","YuMincho","Yu Mincho","Noto Serif JP",serif;
+    --sans: "Hiragino Kaku Gothic ProN","Yu Gothic Medium","Yu Gothic","Hiragino Sans",sans-serif;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    background-image:
+      radial-gradient(rgba(43,38,32,0.025) 1px, transparent 1px);
+    background-size: 9px 9px;
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.6;
+    min-height:100vh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  button{ font-family:inherit; }
+  input,textarea{ font-family:inherit; font-size:16px; }
+
+  /* ── ヘッダー(印譜ロゴ) ───────────────────── */
+  header.app-header{
+    position:sticky; top:0; z-index:20;
+    background:var(--indigo);
+    color:#f3ecdc;
+    padding:14px 18px 14px;
+    display:flex; align-items:center; gap:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.18);
+  }
+  .hanko{
+    width:42px; height:42px; flex:0 0 auto;
+    border-radius:50%;
+    border:2.5px solid var(--vermillion-soft);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--vermillion-soft);
+    font-family:var(--serif);
+    font-size:20px; font-weight:700;
+    transform:rotate(-5deg);
+    background:rgba(171,70,50,0.08);
+    mix-blend-mode:screen;
+    flex-shrink:0;
+  }
+  .app-title{ font-family:var(--serif); }
+  .app-title h1{
+    margin:0; font-size:18px; font-weight:600; letter-spacing:.06em;
+  }
+  .app-title p{
+    margin:2px 0 0; font-size:11.5px; color:#cdd6da; letter-spacing:.04em;
+  }
+
+  /* ── 共通レイアウト ───────────────────────── */
+  main{ max-width:560px; margin:0 auto; padding:14px 14px 110px; }
+  .view{ display:none; }
+  .view.active{ display:block; animation:fadeIn .25s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+  .section-label{
+    font-family:var(--serif);
+    font-size:13px; color:var(--ink-soft); letter-spacing:.08em;
+    margin:18px 2px 8px; display:flex; align-items:center; gap:8px;
+  }
+  .section-label::after{ content:""; flex:1; height:1px; background:var(--line); }
+
+  /* ── 検索バー ─────────────────────────────── */
+  .search-wrap{ position:sticky; top:0; z-index:10; background:var(--bg); padding:12px 0 6px; }
+  .search-box{
+    display:flex; align-items:center; gap:8px;
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius-l); padding:10px 14px;
+    box-shadow:var(--shadow);
+  }
+  .search-box svg{ flex:0 0 auto; opacity:.55; }
+  .search-box input{
+    border:none; outline:none; background:transparent; flex:1; color:var(--ink); font-size:15px;
+  }
+  .count-line{ font-size:12px; color:var(--ink-soft); margin:6px 4px 2px; }
+
+  /* ── 台帳カード一覧 ───────────────────────── */
+  .date-heading{
+    font-family:var(--serif); font-size:13.5px; color:var(--indigo);
+    margin:20px 2px 8px; padding-bottom:5px; border-bottom:1px solid var(--line);
+    letter-spacing:.04em;
+  }
+  .note-card{
+    display:flex; align-items:center; gap:0; background:var(--surface);
+    border-radius:var(--radius-m); margin-bottom:9px; overflow:hidden;
+    box-shadow:var(--shadow); cursor:pointer; border:1px solid var(--line);
+    transition:transform .12s ease;
+  }
+  .note-card:active{ transform:scale(.985); }
+  .note-card .rule{ width:5px; align-self:stretch; background:var(--indigo); flex:0 0 auto; }
+  .note-card.has-flag .rule{ background:var(--vermillion); }
+  .card-delete-btn{
+    border:none; background:transparent; color:var(--ink-soft); opacity:.5;
+    width:38px; height:38px; flex:0 0 auto; margin-right:6px;
+    display:flex; align-items:center; justify-content:center; border-radius:50%;
+  }
+  .card-delete-btn:active{ background:var(--bg-soft); opacity:1; color:var(--vermillion); }
+  .note-card-body{ padding:11px 13px; flex:1; min-width:0; }
+  .note-card-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .note-name{ font-weight:700; font-size:15.5px; }
+  .note-room{ font-size:12.5px; color:var(--ink-soft); white-space:nowrap; }
+  .note-card-meta{ margin-top:5px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .pill{
+    font-size:11.5px; padding:3px 9px; border-radius:99px; background:var(--surface-2); color:var(--ink-soft);
+  }
+  .pill-meal{ background:rgba(35,62,82,0.10); color:var(--indigo); }
+  .pill-allergy{ background:rgba(171,70,50,0.10); color:var(--vermillion); }
+  .flag-row{ display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; color:var(--vermillion); }
+  .stamp-mini{
+    width:18px; height:18px; border-radius:50%; border:1.5px solid var(--vermillion);
+    color:var(--vermillion); display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-family:var(--serif); font-weight:700; flex:0 0 auto; transform:rotate(-6deg);
+  }
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--ink-soft);
+  }
+  .empty-state .hanko{ margin:0 auto 14px; width:54px; height:54px; font-size:24px; }
+
+  /* ── FAB ──────────────────────────────────── */
+  .fab{
+    position:fixed; right:18px; bottom:calc(18px + env(safe-area-inset-bottom));
+    z-index:30; background:var(--indigo); color:#f3ecdc;
+    border:none; border-radius:99px; padding:15px 22px;
+    font-size:15px; font-weight:600; letter-spacing:.03em;
+    box-shadow:0 6px 18px rgba(22,41,58,0.35);
+    display:flex; align-items:center; gap:7px;
+  }
+  .fab:active{ transform:scale(.96); }
+
+  /* ── フォーム画面 ─────────────────────────── */
+  .topbar{
+    display:flex; align-items:center; gap:10px; margin-bottom:10px; padding:2px;
+  }
+  .icon-btn{
+    border:none; background:var(--surface); width:38px; height:38px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); color:var(--indigo);
+  }
+  .topbar h2{ font-family:var(--serif); font-size:18px; margin:0; flex:1; }
+
+  .field{ margin-bottom:16px; }
+  .field label{
+    display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:6px; letter-spacing:.03em;
+    display:flex; align-items:center; gap:5px;
+  }
+  .field label .req{ color:var(--vermillion); font-size:11px; }
+  .field input[type="text"], .field input[type="date"], .field textarea{
+    width:100%; border:none; border-bottom:2px solid var(--line); background:transparent;
+    padding:9px 2px; color:var(--ink); outline:none; resize:vertical;
+  }
+  .field input:focus, .field textarea:focus{ border-bottom-color:var(--gold); }
+  .field textarea{ min-height:54px; line-height:1.55; }
+  .field.alert label{ color:var(--vermillion); }
+  .field.alert textarea, .field.alert input{ border-bottom-color:var(--vermillion-soft); }
+
+  .chip-row{ display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
+  .chip{
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-soft);
+    border-radius:99px; padding:6px 13px; font-size:13px; cursor:pointer; user-select:none;
+  }
+  .chip.toggle.selected{ background:var(--indigo); border-color:var(--indigo); color:#f3ecdc; }
+  .chip.add.added{ background:var(--surface-2); color:var(--ink); border-color:var(--gold); }
+
+  .stepper-grid{
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:10px 14px; margin-top:6px;
+  }
+  .mini-stepper{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-s);
+    padding:8px 10px;
+  }
+  .ms-label{ font-size:13px; color:var(--ink-soft); }
+  .ms-controls{ display:flex; align-items:center; gap:7px; }
+  .ms-btn{
+    width:28px; height:28px; border-radius:50%; border:1px solid var(--line); background:var(--surface-2);
+    font-size:15px; color:var(--indigo); display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+  }
+  .ms-btn:active{ background:var(--bg-soft); }
+  .ms-num{ font-size:15px; font-weight:700; min-width:20px; text-align:center; font-family:var(--serif); }
+  .guest-total{ margin-top:8px; font-size:12.5px; color:var(--ink-soft); text-align:right; }
+
+  .form-actions{
+    position:sticky; bottom:0; background:linear-gradient(to top, var(--bg) 70%, transparent);
+    padding:16px 0 6px; display:flex; gap:10px; margin-top:6px;
+  }
+  .btn{
+    flex:1; border:none; border-radius:99px; padding:13px 0; font-size:15px; font-weight:600;
+    letter-spacing:.03em; cursor:pointer;
+  }
+  .btn-primary{ background:var(--indigo); color:#f3ecdc; }
+  .btn-primary:active{ background:var(--indigo-dark); }
+  .btn-ghost{ background:var(--surface); color:var(--ink-soft); border:1px solid var(--line); flex:0 0 100px; }
+  .btn-danger{ background:var(--vermillion); color:#fbf1ea; }
+  .error-msg{ color:var(--vermillion); font-size:12.5px; margin:-8px 0 14px; display:none; }
+
+  /* ── 詳細画面 ─────────────────────────────── */
+  .detail-card{
+    background:var(--surface); border-radius:var(--radius-l); padding:6px 4px;
+    box-shadow:var(--shadow); border:1px solid var(--line);
+  }
+  .detail-head{
+    padding:16px 18px 14px; border-bottom:1px dashed var(--line); display:flex; justify-content:space-between; align-items:flex-start;
+  }
+  .detail-head .name{ font-family:var(--serif); font-size:19px; font-weight:700; }
+  .detail-head .sub{ font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
+  .detail-row{ padding:13px 18px; border-bottom:1px solid var(--bg-soft); display:flex; gap:14px; }
+  .detail-row:last-child{ border-bottom:none; }
+  .detail-row .k{ width:108px; flex:0 0 auto; font-size:12.5px; color:var(--ink-soft); padding-top:2px; }
+  .detail-row .v{ flex:1; font-size:14.5px; white-space:pre-wrap; word-break:break-word; }
+  .detail-row.alert .v{ color:var(--vermillion); font-weight:600; }
+  .detail-row .v.empty{ color:var(--ink-soft); opacity:.6; }
+  .detail-actions{ display:flex; gap:10px; margin-top:14px; }
+
+  /* ── モーダル & トースト ──────────────────── */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(22,21,18,0.45); z-index:50;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .modal-overlay.hidden{ display:none; }
+  .modal-box{
+    background:var(--surface); border-radius:var(--radius-m); padding:22px; max-width:340px; width:100%;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+  }
+  .modal-box p{ margin:0 0 18px; font-size:14.5px; }
+  .modal-actions{ display:flex; gap:10px; }
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--indigo-dark); color:#f3ecdc; padding:11px 20px; border-radius:99px;
+    font-size:13.5px; z-index:60; box-shadow:0 6px 18px rgba(0,0,0,.3);
+    transition:opacity .25s, transform .25s;
+  }
+  .toast.hidden{ opacity:0; pointer-events:none; transform:translate(-50%,8px); }
+
+  .footnote{ text-align:center; font-size:11px; color:var(--ink-soft); opacity:.7; margin-top:26px; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="hanko">飛</div>
+  <div class="app-title">
+    <h1>飛鳥荘 顧客管理ノート</h1>
+    <p>レストランご利用ゲスト記録</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- ════════════ 一覧画面 ════════════ -->
+  <section id="view-list" class="view active">
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="text" placeholder="お名前・部屋番号・日付で検索" autocomplete="off">
+      </div>
+    </div>
+    <div class="count-line" id="count-line"></div>
+    <div id="list-container"></div>
+  </section>
+
+  <!-- ════════════ 新規登録・編集画面 ════════════ -->
+  <section id="view-form" class="view">
+    <div class="topbar">
+      <button class="icon-btn" id="form-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2 id="form-title">新規登録</h2>
+    </div>
+
+    <div class="field">
+      <label>利用日 <span class="req">必須</span></label>
+      <input type="date" id="f-date">
+    </div>
+    <div class="field">
+      <label>お客様名 <span class="req">必須</span></label>
+      <input type="text" id="f-name" placeholder="山田 太郎 様">
+    </div>
+    <div class="field">
+      <label>部屋番号 <span class="req">必須</span></label>
+      <input type="text" id="f-room" placeholder="201" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>担当者名</label>
+      <input type="text" id="f-staff" placeholder="例：伊藤">
+    </div>
+    <div class="field">
+      <label>人数</label>
+      <div class="stepper-grid">
+        <div class="mini-stepper">
+          <span class="ms-label">大人</span>
+          <div class="ms-controls">
+            <button type="button" class="ms-btn" data-type="adult" data-op="-1">−</button>
+            <span class="ms-num" id="f-adult-num">2</span>
+            <button type="button" class="ms-btn" data-type="adult" data-op="1">+</button>
+          </div>
+        </div>
+        <div class="mini-stepper">
+          <span class="ms-label">子供A</span>
+          <div class="ms-controls">
+            <button type="button" class="ms-btn" data-type="childA" data-op="-1">−</button>
+            <span class="ms-num" id="f-childA-num">0</span>
+            <button type="button" class="ms-btn" data-type="childA" data-op="1">+</button>
+          </div>
+        </div>
+        <div class="mini-stepper">
+          <span class="ms-label">子供B</span>
+          <div class="ms-controls">
+            <button type="button" class="ms-btn" data-type="childB" data-op="-1">−</button>
+            <span class="ms-num" id="f-childB-num">0</span>
+            <button type="button" class="ms-btn" data-type="childB" data-op="1">+</button>
+          </div>
+        </div>
+        <div class="mini-stepper">
+          <span class="ms-label">子供D</span>
+          <div class="ms-controls">
+            <button type="button" class="ms-btn" data-type="childD" data-op="-1">−</button>
+            <span class="ms-num" id="f-childD-num">0</span>
+            <button type="button" class="ms-btn" data-type="childD" data-op="1">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="guest-total" id="guest-total">合計 2名</div>
+    </div>
+    <div class="field">
+      <label>朝食／夕食</label>
+      <div class="chip-row" id="f-meal-chips">
+        <span class="chip toggle" data-val="朝食">朝食</span>
+        <span class="chip toggle" data-val="夕食">夕食</span>
+      </div>
+    </div>
+    <div class="field" id="dinner-course-field" style="display:none;">
+      <label>夕食コース</label>
+      <div class="chip-row" id="f-course-chips">
+        <span class="chip toggle" data-val="松">松</span>
+        <span class="chip toggle" data-val="華">華</span>
+        <span class="chip toggle" data-val="詩">詩</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>アレルギー・苦手食材</label>
+      <input type="text" id="f-allergy" placeholder="例：えび、そば">
+      <div class="chip-row" data-add-target="f-allergy">
+        <span class="chip add">えび・かに</span><span class="chip add">卵</span><span class="chip add">乳製品</span>
+        <span class="chip add">そば</span><span class="chip add">小麦</span><span class="chip add">辛い物が苦手</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>好きな料理・飲み物</label>
+      <input type="text" id="f-favorite" placeholder="例：日本酒（辛口）がお好き">
+    </div>
+    <div class="field">
+      <label>記念日・特別対応</label>
+      <input type="text" id="f-occasion" placeholder="例：結婚記念日">
+      <div class="chip-row" data-add-target="f-occasion">
+        <span class="chip add">誕生日</span><span class="chip add">結婚記念日</span><span class="chip add">ハネムーン</span>
+        <span class="chip add">還暦祝い</span><span class="chip add">法要</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>スタッフメモ</label>
+      <textarea id="f-memo" placeholder="接客時に気づいたことなど"></textarea>
+    </div>
+    <div class="field alert">
+      <label>⚑ 次回注意事項</label>
+      <textarea id="f-next" placeholder="次回ご来館時に必ず確認したいこと"></textarea>
+    </div>
+
+    <div class="error-msg" id="form-error">利用日・お客様名・部屋番号は必須です。</div>
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="form-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="form-save">保存する</button>
+    </div>
+  </section>
+
+  <!-- ════════════ 詳細画面 ════════════ -->
+  <section id="view-detail" class="view">
+    <div class="topbar">
+      <button class="icon-btn" id="detail-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2>詳細</h2>
+    </div>
+    <div class="detail-card" id="detail-card"></div>
+    <div class="detail-actions">
+      <button class="btn btn-ghost" id="detail-delete" style="flex:0 0 110px;">削除</button>
+      <button class="btn btn-primary" id="detail-edit">編集する</button>
+    </div>
+  </section>
+
+  <p class="footnote">※ この記録は本画面を開く全スタッフで共有されます</p>
+</main>
+
+<button class="fab" id="fab-add">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
+  新規登録
+</button>
+
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal-box">
+    <p id="modal-message"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-cancel" style="flex:1;">キャンセル</button>
+      <button class="btn btn-danger" id="modal-confirm" style="flex:1;">削除する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   データ層 (DataStore)
+   ──────────────────────────────────────────────────────────
+   今は window.storage（ブラウザ内永続保存・スタッフ間共有）を使用。
+   将来 Google スプレッドシート / Supabase へ移行する際は、
+   この DataStore オブジェクトの内部実装だけを書き換えれば良い
+   ように getAll / add / update / remove のシグネチャを固定している。
+   ════════════════════════════════════════════════════════════ */
+const DataStore = {
+  KEY: 'guest-notes',     // 1つのキーに配列としてまとめて保存（少量データのため）
+  SHARED: true,           // スタッフ全員で共有するデータ
+
+  async getAll() {
+    try {
+      const res = await window.storage.get(this.KEY, this.SHARED);
+      return res && res.value ? JSON.parse(res.value) : [];
+    } catch (e) {
+      // キーが存在しない場合などはここに来る
+      return [];
+    }
+  },
+  async _saveAll(notes) {
+    try {
+      const res = await window.storage.set(this.KEY, JSON.stringify(notes), this.SHARED);
+      if (!res) throw new Error('save failed');
+      return true;
+    } catch (e) {
+      console.error('保存エラー', e);
+      return false;
+    }
+  },
+  async add(note) {
+    const notes = await this.getAll();
+    notes.push(note);
+    return this._saveAll(notes);
+  },
+  async update(id, updatedFields) {
+    const notes = await this.getAll();
+    const idx = notes.findIndex(n => n.id === id);
+    if (idx === -1) return false;
+    notes[idx] = { ...notes[idx], ...updatedFields };
+    return this._saveAll(notes);
+  },
+  async remove(id) {
+    const notes = await this.getAll();
+    const filtered = notes.filter(n => n.id !== id);
+    return this._saveAll(filtered);
+  }
+};
+/* ─── 将来移行する場合の例 ───────────────────────────────────
+   Google スプレッドシート: Apps Script の Web アプリ API を fetch() で
+   呼び出し、getAll は GET、add/update/remove は POST するよう書き換える。
+   Supabase: supabase-js の from('guest_notes').select() / insert() /
+   update() / delete() に置き換える。呼び出し側のコードは変更不要。
+   ──────────────────────────────────────────────────────────── */
+
+
+/* ════════════════════════════════════════════════════════════
+   状態管理・ユーティリティ
+   ════════════════════════════════════════════════════════════ */
+let allNotes = [];
+let editingId = null;     // 編集中のノートID（null = 新規登録）
+let detailId = null;      // 詳細表示中のノートID
+let counts = { adult: 2, childA: 0, childB: 0, childD: 0 };  // 大人・子供A・子供B・子供D
+let selectedMeal = null;  // '朝食' | '夕食' | null
+let selectedCourse = null; // '松' | '華' | '詩' | null（夕食選択時のみ使用）
+
+const WEEKDAYS = ['日','月','火','水','木','金','土'];
+
+function uid() {
+  return 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function todayStr() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d - tz).toISOString().slice(0, 10);
+}
+function escapeHtml(str) {
+  return (str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function formatDateHeading(dateStr) {
+  if (!dateStr) return '日付未設定';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`;
+}
+function formatDateShort(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+function getTotalGuests(n) {
+  // 新形式(大人/子供A/B/D)と旧形式(peopleCountのみ)の両方に対応
+  if (n.adultCount != null || n.childACount != null) {
+    return (n.adultCount||0) + (n.childACount||0) + (n.childBCount||0) + (n.childDCount||0);
+  }
+  return n.peopleCount || 0;
+}
+function formatGuestBreakdown(n) {
+  const parts = [];
+  const adult = n.adultCount != null ? n.adultCount : (n.peopleCount || 0);
+  if (adult) parts.push(`大人${adult}名`);
+  if (n.childACount) parts.push(`子供A${n.childACount}名`);
+  if (n.childBCount) parts.push(`子供B${n.childBCount}名`);
+  if (n.childDCount) parts.push(`子供D${n.childDCount}名`);
+  return parts.join('・');
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add('hidden'), 1800);
+}
+function confirmDialog(message) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('modal-overlay');
+    document.getElementById('modal-message').textContent = message;
+    overlay.classList.remove('hidden');
+    const cleanup = (result) => {
+      overlay.classList.add('hidden');
+      cancelBtn.removeEventListener('click', onCancel);
+      okBtn.removeEventListener('click', onOk);
+      resolve(result);
+    };
+    const cancelBtn = document.getElementById('modal-cancel');
+    const okBtn = document.getElementById('modal-confirm');
+    const onCancel = () => cleanup(false);
+    const onOk = () => cleanup(true);
+    cancelBtn.addEventListener('click', onCancel);
+    okBtn.addEventListener('click', onOk);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   画面切り替え
+   ════════════════════════════════════════════════════════════ */
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+/* ════════════════════════════════════════════════════════════
+   一覧画面
+   ════════════════════════════════════════════════════════════ */
+async function refreshAndRenderList() {
+  document.getElementById('list-container').innerHTML =
+    '<p style="text-align:center;color:var(--ink-soft);padding:30px 0;">読み込み中…</p>';
+  allNotes = await DataStore.getAll();
+  renderList();
+}
+
+function renderList() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  let notes = [...allNotes];
+
+  if (q) {
+    notes = notes.filter(n =>
+      (n.guestName || '').toLowerCase().includes(q) ||
+      (n.roomNumber || '').toLowerCase().includes(q) ||
+      (n.visitDate || '').includes(q) ||
+      formatDateShort(n.visitDate).includes(q)
+    );
+  }
+
+  notes.sort((a, b) => {
+    if (a.visitDate !== b.visitDate) return (b.visitDate || '').localeCompare(a.visitDate || '');
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+
+  document.getElementById('count-line').textContent =
+    q ? `検索結果：${notes.length}件` : `全${notes.length}件`;
+
+  const container = document.getElementById('list-container');
+  if (notes.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="hanko" style="margin:0 auto 14px;">飛</div>
+        ${q ? '一致する記録が見つかりません。' : '記録はまだありません。<br>右下の「新規登録」から最初の記録を残しましょう。'}
+      </div>`;
+    return;
+  }
+
+  let html = '';
+  let lastDate = null;
+  for (const n of notes) {
+    if (n.visitDate !== lastDate) {
+      html += `<div class="date-heading">${formatDateHeading(n.visitDate)}</div>`;
+      lastDate = n.visitDate;
+    }
+    const hasFlag = !!(n.nextNotes && n.nextNotes.trim());
+    const mealLabel = n.mealType ? (n.mealType === '夕食' && n.dinnerCourse ? `夕食（${n.dinnerCourse}）` : n.mealType) : '';
+    html += `
+      <div class="note-card ${hasFlag ? 'has-flag' : ''}" data-id="${n.id}">
+        <div class="rule"></div>
+        <div class="note-card-body">
+          <div class="note-card-top">
+            <span class="note-name">${escapeHtml(n.guestName)} 様</span>
+            <span class="note-room">${escapeHtml(n.roomNumber)}号室</span>
+          </div>
+          <div class="note-card-meta">
+            ${getTotalGuests(n) ? `<span class="pill">${getTotalGuests(n)}名</span>` : ''}
+            ${mealLabel ? `<span class="pill pill-meal">${escapeHtml(mealLabel)}</span>` : ''}
+            ${n.allergies ? `<span class="pill pill-allergy">⚠ アレルギー有</span>` : ''}
+          </div>
+          ${hasFlag ? `<div class="flag-row"><span class="stamp-mini">要</span> 次回注意：${escapeHtml(n.nextNotes).slice(0,28)}${n.nextNotes.length>28?'…':''}</div>` : ''}
+        </div>
+        <button class="card-delete-btn" data-id="${n.id}" aria-label="削除" title="削除">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
+        </button>
+      </div>`;
+  }
+  container.innerHTML = html;
+
+  container.querySelectorAll('.note-card').forEach(card => {
+    card.addEventListener('click', () => openDetail(card.dataset.id));
+  });
+
+  container.querySelectorAll('.card-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const ok = await confirmDialog('この記録を削除しますか？この操作は取り消せません。');
+      if (!ok) return;
+      const result = await DataStore.remove(id);
+      if (result) {
+        showToast('削除しました');
+        await refreshAndRenderList();
+      } else {
+        showToast('削除に失敗しました');
+      }
+    });
+  });
+}
+
+document.getElementById('search-input').addEventListener('input', renderList);
+
+/* ════════════════════════════════════════════════════════════
+   登録・編集フォーム
+   ════════════════════════════════════════════════════════════ */
+function resetForm() {
+  document.getElementById('f-date').value = todayStr();
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-room').value = '';
+  document.getElementById('f-staff').value = '';
+  document.getElementById('f-allergy').value = '';
+  document.getElementById('f-favorite').value = '';
+  document.getElementById('f-occasion').value = '';
+  document.getElementById('f-memo').value = '';
+  document.getElementById('f-next').value = '';
+  counts = { adult: 2, childA: 0, childB: 0, childD: 0 };
+  updateStepperUI();
+  selectedMeal = null;
+  selectedCourse = null;
+  document.getElementById('dinner-course-field').style.display = 'none';
+  document.querySelectorAll('#f-meal-chips .chip').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('#f-course-chips .chip').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.chip.add').forEach(c => c.classList.remove('added'));
+  document.getElementById('form-error').style.display = 'none';
+}
+
+function openNewForm() {
+  editingId = null;
+  resetForm();
+  document.getElementById('form-title').textContent = '新規登録';
+  showView('view-form');
+}
+
+function openEditForm(id) {
+  const n = allNotes.find(x => x.id === id);
+  if (!n) return;
+  editingId = id;
+  resetForm();
+  document.getElementById('f-date').value = n.visitDate || todayStr();
+  document.getElementById('f-name').value = n.guestName || '';
+  document.getElementById('f-room').value = n.roomNumber || '';
+  document.getElementById('f-staff').value = n.staffName || '';
+  document.getElementById('f-allergy').value = n.allergies || '';
+  document.getElementById('f-favorite').value = n.favorites || '';
+  document.getElementById('f-occasion').value = n.specialOccasion || '';
+  document.getElementById('f-memo').value = n.staffMemo || '';
+  document.getElementById('f-next').value = n.nextNotes || '';
+  counts = {
+    adult: (n.adultCount != null ? n.adultCount : (n.peopleCount != null ? n.peopleCount : 2)),
+    childA: n.childACount || 0,
+    childB: n.childBCount || 0,
+    childD: n.childDCount || 0
+  };
+  updateStepperUI();
+  if (n.mealType) {
+    selectedMeal = n.mealType;
+    document.querySelectorAll('#f-meal-chips .chip').forEach(c => {
+      c.classList.toggle('selected', c.dataset.val === n.mealType);
+    });
+  }
+  if (n.mealType === '夕食') {
+    document.getElementById('dinner-course-field').style.display = '';
+    if (n.dinnerCourse) {
+      selectedCourse = n.dinnerCourse;
+      document.querySelectorAll('#f-course-chips .chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.val === n.dinnerCourse);
+      });
+    }
+  }
+  document.getElementById('form-title').textContent = '編集';
+  showView('view-form');
+}
+
+function updateStepperUI() {
+  document.getElementById('f-adult-num').textContent = counts.adult;
+  document.getElementById('f-childA-num').textContent = counts.childA;
+  document.getElementById('f-childB-num').textContent = counts.childB;
+  document.getElementById('f-childD-num').textContent = counts.childD;
+  const total = counts.adult + counts.childA + counts.childB + counts.childD;
+  document.getElementById('guest-total').textContent = `合計 ${total}名`;
+}
+document.querySelectorAll('.ms-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
+    const delta = parseInt(btn.dataset.op, 10);
+    const next = counts[type] + delta;
+    if (next >= 0 && next <= 30) counts[type] = next;
+    updateStepperUI();
+  });
+});
+
+document.querySelectorAll('#f-meal-chips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const val = chip.dataset.val;
+    if (selectedMeal === val) {
+      selectedMeal = null;
+      chip.classList.remove('selected');
+    } else {
+      selectedMeal = val;
+      document.querySelectorAll('#f-meal-chips .chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    }
+    const courseField = document.getElementById('dinner-course-field');
+    if (selectedMeal === '夕食') {
+      courseField.style.display = '';
+    } else {
+      courseField.style.display = 'none';
+      selectedCourse = null;
+      document.querySelectorAll('#f-course-chips .chip').forEach(c => c.classList.remove('selected'));
+    }
+  });
+});
+
+document.querySelectorAll('#f-course-chips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const val = chip.dataset.val;
+    if (selectedCourse === val) {
+      selectedCourse = null;
+      chip.classList.remove('selected');
+    } else {
+      selectedCourse = val;
+      document.querySelectorAll('#f-course-chips .chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    }
+  });
+});
+
+document.querySelectorAll('.chip-row[data-add-target]').forEach(row => {
+  const targetId = row.dataset.addTarget;
+  row.querySelectorAll('.chip.add').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const input = document.getElementById(targetId);
+      const word = chip.textContent.trim();
+      let parts = input.value.split(/[、,]\s*/).map(s => s.trim()).filter(Boolean);
+      if (parts.includes(word)) {
+        parts = parts.filter(p => p !== word);
+        chip.classList.remove('added');
+      } else {
+        parts.push(word);
+        chip.classList.add('added');
+      }
+      input.value = parts.join('、');
+    });
+  });
+});
+
+document.getElementById('form-save').addEventListener('click', async () => {
+  const visitDate = document.getElementById('f-date').value;
+  const guestName = document.getElementById('f-name').value.trim();
+  const roomNumber = document.getElementById('f-room').value.trim();
+
+  if (!visitDate || !guestName || !roomNumber) {
+    document.getElementById('form-error').style.display = 'block';
+    return;
+  }
+  document.getElementById('form-error').style.display = 'none';
+
+  const payload = {
+    visitDate,
+    guestName,
+    roomNumber,
+    staffName: document.getElementById('f-staff').value.trim(),
+    adultCount: counts.adult,
+    childACount: counts.childA,
+    childBCount: counts.childB,
+    childDCount: counts.childD,
+    mealType: selectedMeal,
+    dinnerCourse: selectedMeal === '夕食' ? selectedCourse : null,
+    allergies: document.getElementById('f-allergy').value.trim(),
+    favorites: document.getElementById('f-favorite').value.trim(),
+    specialOccasion: document.getElementById('f-occasion').value.trim(),
+    staffMemo: document.getElementById('f-memo').value.trim(),
+    nextNotes: document.getElementById('f-next').value.trim(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const saveBtn = document.getElementById('form-save');
+  saveBtn.disabled = true; saveBtn.textContent = '保存中…';
+
+  let ok;
+  if (editingId) {
+    ok = await DataStore.update(editingId, payload);
+  } else {
+    ok = await DataStore.add({ id: uid(), createdAt: new Date().toISOString(), ...payload });
+  }
+
+  saveBtn.disabled = false; saveBtn.textContent = '保存する';
+
+  if (ok) {
+    showToast(editingId ? '更新しました' : '登録しました');
+    await refreshAndRenderList();
+    showView('view-list');
+  } else {
+    showToast('保存に失敗しました。もう一度お試しください');
+  }
+});
+
+document.getElementById('form-cancel').addEventListener('click', () => showView('view-list'));
+document.getElementById('form-back').addEventListener('click', () => showView('view-list'));
+document.getElementById('fab-add').addEventListener('click', openNewForm);
+
+/* ════════════════════════════════════════════════════════════
+   詳細画面
+   ════════════════════════════════════════════════════════════ */
+function detailRow(label, value, alert) {
+  const has = value && String(value).trim();
+  return `<div class="detail-row ${alert ? 'alert' : ''}">
+    <div class="k">${label}</div>
+    <div class="v ${has ? '' : 'empty'}">${has ? escapeHtml(value) : '記載なし'}</div>
+  </div>`;
+}
+
+function openDetail(id) {
+  const n = allNotes.find(x => x.id === id);
+  if (!n) return;
+  detailId = id;
+
+  document.getElementById('detail-card').innerHTML = `
+    <div class="detail-head">
+      <div>
+        <div class="name">${escapeHtml(n.guestName)} 様</div>
+        <div class="sub">${formatDateHeading(n.visitDate)}・${escapeHtml(n.roomNumber)}号室${n.staffName ? '・担当：' + escapeHtml(n.staffName) : ''}</div>
+      </div>
+      ${n.nextNotes ? `<div class="stamp-mini" style="width:26px;height:26px;font-size:12px;">要</div>` : ''}
+    </div>
+    ${detailRow('人数', formatGuestBreakdown(n))}
+    ${detailRow('朝食／夕食', n.mealType)}
+    ${n.mealType === '夕食' ? detailRow('夕食コース', n.dinnerCourse) : ''}
+    ${detailRow('アレルギー・苦手食材', n.allergies)}
+    ${detailRow('好きな料理・飲み物', n.favorites)}
+    ${detailRow('記念日・特別対応', n.specialOccasion)}
+    ${detailRow('スタッフメモ', n.staffMemo)}
+    ${detailRow('⚑ 次回注意事項', n.nextNotes, true)}
+  `;
+  showView('view-detail');
+}
+
+document.getElementById('detail-back').addEventListener('click', () => showView('view-list'));
+document.getElementById('detail-edit').addEventListener('click', () => {
+  if (detailId) openEditForm(detailId);
+});
+document.getElementById('detail-delete').addEventListener('click', async () => {
+  if (!detailId) return;
+  const ok = await confirmDialog('この記録を削除しますか？この操作は取り消せません。');
+  if (!ok) return;
+  const result = await DataStore.remove(detailId);
+  if (result) {
+    showToast('削除しました');
+    await refreshAndRenderList();
+    showView('view-list');
+  } else {
+    showToast('削除に失敗しました');
+  }
+});
+
+/* ════════════════════════════════════════════════════════════
+   起動
+   ════════════════════════════════════════════════════════════ */
+refreshAndRenderList();
+</script>
+</body>
+</html>
